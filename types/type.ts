@@ -10,7 +10,6 @@ export interface FormData {
     location_lng: string;
     specialties: string[];
     profile_picture: string;
-    profileImage?: any;
 }
 
 export interface FormErrors {

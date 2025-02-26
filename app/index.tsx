@@ -9,11 +9,10 @@ import { useAccount } from "wagmi";
 
 const IndexPage = () => {
     const { address } = useAccount();
-    const { data } = usePatient(address!);
 
-    if (data) {
-        return <Redirect href={"/(root)/(tabs)"} />;
-    }
+    // if (address) {
+    //     return <Redirect href={"/(root)/(tabs)"} />;
+    // }
 
     return <Redirect href={"/(auth)/welcome"} />;
 };

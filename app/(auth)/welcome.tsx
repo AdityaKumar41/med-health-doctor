@@ -8,7 +8,7 @@ import { useAccount } from "wagmi";
 
 const Index = () => {
 
-  const isLogged = true;
+  const isLogged = false;
 
 
   const handleGetStarted = () => {
@@ -19,7 +19,7 @@ const Index = () => {
   console.log(address)
 
   useEffect(() => {
-    if (address) {
+    if (!address) {
       router.replace("/(root)/(tabs)");
     }
   }, [address])

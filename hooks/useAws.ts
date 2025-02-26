@@ -1,18 +1,29 @@
-import { useQuery } from "@tanstack/react-query"
-import axios from "axios"
+import { useMutation } from "@tanstack/react-query";
+import axios from "axios";
 
-export const useAws = (address: String) => {
-    return useQuery({
-        queryKey: ['aws-query'],
-        queryFn: async () => {
-            const response = await axios.get(`${process.env.EXPO_PUBLIC_BASE_URL}/aws`, {
+interface SignedUrlParams {
+    filename: string;
+    filetype: string;
+}
+
+export const useSignedUrl = (address: string) => {
+    return useMutation({
+        mutationFn: async ({ filename, filetype }: SignedUrlParams) => {
+
+            const response = await axios({
+                method: 'POST',
+                url: `${process.env.EXPO_PUBLIC_BASE_URL}/aws/signedurl`,
                 headers: {
+                    'Authorization': `Bearer ${address}`,
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    Authorization: `Bearer ${address}`,
                 },
+                data: {
+                    filename,
+                    filetype
+                }
             });
+
             return response.data;
         }
-    })
-}
+    });
+};
