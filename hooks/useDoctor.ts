@@ -2,7 +2,7 @@ import { FormData } from "@/types/type";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import axios from "axios";
 
-export const useDoctorPost = (p0: string) => {
+export const useDoctorPost = (address: string) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (doctor: FormData) => {
@@ -15,6 +15,7 @@ export const useDoctorPost = (p0: string) => {
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
+                        'Authorization': `Bearer ${address}`,
                     },
                 });
 
@@ -56,4 +57,19 @@ export const useDoctor = (address: string) => {
             return responose.data;
         }
     })
+}
+
+// get all doctors by id
+export const useDoctorsByIds = (doctorIds: string[]) => {
+    return useQuery({
+        queryKey: ["doctorsId", doctorIds],
+        queryFn: async () => {
+            const responose = await axios({
+                method: 'POST',
+                data: { doctorIds },
+                url: `${process.env.EXPO_PUBLIC_BASE_URL}/v1/doctors/bulk`
+            });
+            return responose.data;
+        }
+    });
 }

@@ -7,6 +7,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useAccount } from "wagmi";
 import DoctorAppointmentCard from "@/components/DoctorAppointmentCard";
 import { ServiceCard } from "@/components/ServiceCard";
+import { useDoctor } from "@/hooks/useDoctor";
 
 const services = [
   {
@@ -40,9 +41,25 @@ const services = [
 ];
 
 const Home = () => {
+  const firstTimeRef = React.useRef(true)
   const { address } = useAccount();
-  // Mock appointments data
-  
+  const { data, refetch, error } = useDoctor(address!);
+
+  console.log(data)
+  console.log(error)
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (firstTimeRef.current) {
+        firstTimeRef.current = false;
+        return;
+      }
+
+      refetch()
+    }, [refetch])
+  );
+
+
   const appointments = [
     {
       patientName: "John Doe",
@@ -65,7 +82,7 @@ const Home = () => {
           <View className="flex flex-col p-4 w-full">
             <View className="flex flex-row gap-10 justify-between items-center w-full">
               <View className="flex flex-col self-stretch my-auto tracking-wide">
-                <Text className="font-JakartaExtraBold text-2xl">Doctor's Dashboard</Text>
+                <Text className="font-JakartaExtraBold text-2xl">Hello {data?.data?.name}</Text>
                 <Text className="font-Jakarta text-base text-zinc-700">
                   Welcome back to your practice
                 </Text>

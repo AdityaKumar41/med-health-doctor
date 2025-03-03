@@ -8,9 +8,6 @@ import { useAccount } from "wagmi";
 
 const Index = () => {
 
-  const isLogged = false;
-
-
   const handleGetStarted = () => {
     router.replace("/(auth)/wallet");
   };
@@ -19,7 +16,7 @@ const Index = () => {
   console.log(address)
 
   useEffect(() => {
-    if (!address) {
+    if (address) {
       router.replace("/(root)/(tabs)");
     }
   }, [address])

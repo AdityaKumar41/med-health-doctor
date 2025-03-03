@@ -65,3 +65,18 @@ export const usePatient = (address: string) => {
         }
     })
 }
+
+// get patient by id
+export const usePatientsById = (patientids: string[]) => {
+    return useQuery({
+        queryKey: ["patientids", patientids],
+        queryFn: async () => {
+            const responose = await axios({
+                method: 'POST',
+                data: { patientids },
+                url: `${process.env.EXPO_PUBLIC_BASE_URL}/v1/patients/bulk`
+            });
+            return responose.data;
+        }
+    });
+}

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, Platform, Modal, FlatList } from "react-native";
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import InputField from "@/components/InputField";
@@ -45,6 +45,7 @@ interface ExtendedFormData extends FormData {
     latitude: number;
     longitude: number;
   };
+  consultancy_fees: string;
 }
 
 const Register = () => {
@@ -79,6 +80,7 @@ const Register = () => {
       latitude: 0,
       longitude: 0,
     },
+    consultancy_fees: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const { mutate } = useDoctorPost(address!);
@@ -88,6 +90,8 @@ const Register = () => {
     latitude: 20.5937,
     longitude: 78.9629,
   });
+  const [showStartTimeModal, setShowStartTimeModal] = useState(false);
+  const [showEndTimeModal, setShowEndTimeModal] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -144,6 +148,20 @@ const Register = () => {
       key: "bio",
       icon: "information-circle-outline",
       keyboardType: "default"
+    },
+    {
+      label: "Registration No",
+      placeholder: "Enter your registration number",
+      key: "doctor_id",
+      icon: "id-card-outline",
+      keyboardType: "default"
+    },
+    {
+      label: "Consultancy Fees",
+      placeholder: "Enter your consultancy fees in crypto",
+      key: "consultancy_fees",
+      icon: "cash-outline",
+      keyboardType: "numeric"
     }
   ];
 
@@ -219,6 +237,18 @@ const Register = () => {
       !availableTime[0].start_time ||
       !availableTime[0].end_time) {
       newErrors.availableTime = "Please set your available time slots";
+    }
+
+    // Doctor ID validation
+    if (!formData.doctor_id.trim()) {
+      newErrors.doctor_id = "Registration number is required";
+    }
+
+    // Consultancy Fees validation
+    if (!formData.consultancy_fees.trim()) {
+      newErrors.consultancy_fees = "Consultancy fees are required";
+    } else if (isNaN(Number(formData.consultancy_fees)) || Number(formData.consultancy_fees) < 0) {
+      newErrors.consultancy_fees = "Please enter a valid consultancy fee";
     }
 
     setErrors(newErrors);
@@ -329,11 +359,11 @@ const Register = () => {
       }
 
       // Call the API to register the doctor
-      await mutate({
+      mutate({
         name: formData.name,
         email: formData.email,
         age: Number(formData.age),
-        doctor_id: address!,
+        doctor_id: formData.doctor_id,
         hospital: formData.hospital,
         experience: Number(formData.experience),
         qualification: formData.qualification,
@@ -347,6 +377,7 @@ const Register = () => {
         },
         available_days: availableDays,
         available_time: availableTime,
+        consultancy_fees: formData.consultancy_fees,
       });
 
       // router.replace("/(root)/(tabs)");
@@ -464,6 +495,28 @@ const Register = () => {
     </View>
   );
 
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute of [0, 30]) {
+        const formattedHour = hour.toString().padStart(2, '0');
+        const formattedMinute = minute.toString().padStart(2, '0');
+        slots.push(`${formattedHour}:${formattedMinute}`);
+      }
+    }
+    return slots;
+  };
+
+  const timeSlots = generateTimeSlots();
+
+  const addTimeSlot = () => {
+    setAvailableTime(prev => [...prev, { start_time: "09:00", end_time: "17:00" }]);
+  };
+
+  const removeTimeSlot = (index: number) => {
+    setAvailableTime(prev => prev.filter((_, i) => i !== index));
+  };
+
   const renderAvailableDays = () => (
     <View className="mb-6">
       <Text className="font-JakartaMedium text-base mb-2">Available Days</Text>
@@ -501,39 +554,114 @@ const Register = () => {
   const renderAvailableTime = () => (
     <View className="mb-6">
       <Text className="font-JakartaMedium text-base mb-2">Available Hours</Text>
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1 mr-2">
-          <Text className="text-sm text-gray-600 mb-1">Start Time</Text>
-          <TouchableOpacity
-            className="border border-gray-300 rounded-md p-3"
-            onPress={() => {
-              // Here you would typically show a time picker
-              // For this example, we'll just use a pre-set time
-              const newTime = [...availableTime];
-              newTime[0] = { ...newTime[0], start_time: "09:00" };
-              setAvailableTime(newTime);
-            }}
-          >
-            <Text>{availableTime[0]?.start_time || "Select time"}</Text>
-          </TouchableOpacity>
-        </View>
+      {availableTime.map((timeSlot, index) => (
+        <View key={index} className="flex-row items-center justify-between mb-2">
+          <View className="flex-1 mr-2">
+            <Text className="text-sm text-gray-600 mb-1">Start Time</Text>
+            <TouchableOpacity
+              className="border border-gray-300 rounded-md p-3"
+              onPress={() => setShowStartTimeModal(true)}
+            >
+              <Text>{timeSlot.start_time || "Select time"}</Text>
+            </TouchableOpacity>
+            <Modal
+              visible={showStartTimeModal}
+              transparent={true}
+              animationType="slide"
+            >
+              <View className="flex-1 justify-center items-center bg-black/50">
+                <View className="bg-white w-4/5 h-1/2 rounded-lg p-4">
+                  <Text className="font-JakartaBold text-lg mb-4 text-center">Select Start Time</Text>
+                  <FlatList
+                    data={timeSlots}
+                    keyExtractor={(item) => item}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        className={`p-3 border-b border-gray-100 ${timeSlot.start_time === item ? "bg-blue-100" : ""}`}
+                        onPress={() => {
+                          setAvailableTime(prev => {
+                            const newTimeSlots = [...prev];
+                            newTimeSlots[index] = { ...newTimeSlots[index], start_time: item };
+                            return newTimeSlots;
+                          });
+                          setShowStartTimeModal(false);
+                        }}
+                      >
+                        <Text className="text-center">{item}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                  <TouchableOpacity
+                    className="mt-4 bg-gray-200 p-3 rounded-lg"
+                    onPress={() => setShowStartTimeModal(false)}
+                  >
+                    <Text className="text-center font-JakartaMedium">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          </View>
 
-        <View className="flex-1 ml-2">
-          <Text className="text-sm text-gray-600 mb-1">End Time</Text>
+          <View className="flex-1 ml-2">
+            <Text className="text-sm text-gray-600 mb-1">End Time</Text>
+            <TouchableOpacity
+              className="border border-gray-300 rounded-md p-3"
+              onPress={() => setShowEndTimeModal(true)}
+            >
+              <Text>{timeSlot.end_time || "Select time"}</Text>
+            </TouchableOpacity>
+            <Modal
+              visible={showEndTimeModal}
+              transparent={true}
+              animationType="slide"
+            >
+              <View className="flex-1 justify-center items-center bg-black/50">
+                <View className="bg-white w-4/5 h-1/2 rounded-lg p-4">
+                  <Text className="font-JakartaBold text-lg mb-4 text-center">Select End Time</Text>
+                  <FlatList
+                    data={timeSlots}
+                    keyExtractor={(item) => item}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        className={`p-3 border-b border-gray-100 ${timeSlot.end_time === item ? "bg-blue-100" : ""}`}
+                        onPress={() => {
+                          setAvailableTime(prev => {
+                            const newTimeSlots = [...prev];
+                            newTimeSlots[index] = { ...newTimeSlots[index], end_time: item };
+                            return newTimeSlots;
+                          });
+                          setShowEndTimeModal(false);
+                        }}
+                      >
+                        <Text className="text-center">{item}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                  <TouchableOpacity
+                    className="mt-4 bg-gray-200 p-3 rounded-lg"
+                    onPress={() => setShowEndTimeModal(false)}
+                  >
+                    <Text className="text-center font-JakartaMedium">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          </View>
+
           <TouchableOpacity
-            className="border border-gray-300 rounded-md p-3"
-            onPress={() => {
-              // Here you would typically show a time picker
-              // For this example, we'll just use a pre-set time
-              const newTime = [...availableTime];
-              newTime[0] = { ...newTime[0], end_time: "17:00" };
-              setAvailableTime(newTime);
-            }}
+            className="ml-2 p-2 bg-red-500 rounded-full"
+            onPress={() => removeTimeSlot(index)}
           >
-            <Text>{availableTime[0]?.end_time || "Select time"}</Text>
+            <Ionicons name="remove-circle-outline" size={24} color="white" />
           </TouchableOpacity>
         </View>
-      </View>
+      ))}
+      <TouchableOpacity
+        className="mt-4 bg-blue-500 p-3 rounded-lg"
+        onPress={addTimeSlot}
+      >
+        <Text className="text-center text-white font-JakartaMedium">Add Time Slot</Text>
+      </TouchableOpacity>
       {errors.availableTime && (
         <Text className="text-red-500 text-sm mt-1">{errors.availableTime}</Text>
       )}
@@ -562,7 +690,7 @@ const Register = () => {
               <InputField
                 label={input.label}
                 placeholder={input.placeholder}
-                value={formData[input.key]}
+                value={String(formData[input.key])}
                 onChangeText={(text: string) => handleInputChange(input.key, text)}
                 error={errors[input.key]}
                 secureTextEntry={input.secureTextEntry}

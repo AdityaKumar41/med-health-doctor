@@ -9,15 +9,25 @@ import { router } from "expo-router";
 import { MenuSectionProps } from "@/types/type";
 import { StatusBar } from "expo-status-bar";
 import { useDoctor } from "@/hooks/useDoctor";
+import { avarageRating } from "@/utils";
 
 const Account = () => {
   const { address, isConnected } = useAccount();
-  const { data } = useDoctor(address!);
+  const { data: oldData } = useDoctor(address!);
+  const data = oldData.data;
+
+  console.log(data);
+
   const { open } = useAppKit();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(data?.name || "Dr. Smith");
-  const [specialization, setSpecialization] = useState(data?.specialization || "General Physician");
-  const [profileImage, setProfileImage] = useState(data?.profile_picture || "https://cdn.builder.io/api/v1/image/assets/95a3c52e460440f58cf6776b478813ea/d6954879c6447b5b7d4cb004f31f770ede1b0a30c57fa508d0fbb42671a80517");
+  const [specialization, setSpecialization] = useState(
+    data?.specialties?.[0]?.name || "General Physician"
+  );
+  const [profileImage, setProfileImage] = useState(
+    data?.profile_picture ||
+    "https://cdn.builder.io/api/v1/image/assets/95a3c52e460440f58cf6776b478813ea/d6954879c6447b5b7d4cb004f31f770ede1b0a30c57fa508d0fbb42671a80517"
+  );
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -117,8 +127,8 @@ const Account = () => {
 
           {/* Stats Cards */}
           <View className="flex-row justify-between mt-6">
-            <StatCard title="Today's Patients" value={doctorInfo.todayAppointments} />
-            <StatCard title="Rating" value={doctorInfo.rating} />
+            <StatCard title="Total Appointment" value={data?.appointments?.length || 0} />
+            <StatCard title="Rating" value={data?.average_rating || "Not rated yet"} />
           </View>
         </View>
       </View>
@@ -129,10 +139,13 @@ const Account = () => {
         <MenuSection
           title="Professional Information"
           items={[
-            { icon: "medical", label: "Specialization", value: data?.specialization },
-            { icon: "business", label: "Hospital", value: data?.hospital },
-            { icon: "time", label: "Experience", value: data?.experience },
-            { icon: "mail", label: "Email", value: data?.email },
+            { icon: "medical", label: "Specialization", value: data?.specialties?.map((s: { name: any; }) => s.name).join(", ") || "Not specified" },
+            { icon: "business", label: "Hospital", value: data?.hospital || "Not specified" },
+            { icon: "time", label: "Experience", value: data?.experience ? `${data.experience} years` : "Not specified" },
+            { icon: "mail", label: "Email", value: data?.email || "Not specified" },
+            { icon: "document-text", label: "Qualification", value: data?.qualification || "Not specified" },
+            { icon: "information-circle", label: "Bio", value: data?.bio || "Not specified" },
+            { icon: "calendar", label: "Available Days", value: data?.available_days?.join(", ") || "Not specified" },
           ]}
           isEditing={isEditing}
           onValueChange={(label, value) => {

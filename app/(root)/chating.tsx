@@ -6,6 +6,8 @@ import { useChat } from '@/context/ChatContext';
 import { router, useNavigation } from 'expo-router';
 import { Image } from 'react-native';
 import { format } from 'date-fns';
+import { useDoctor } from '@/hooks/useDoctor';
+import { useAccount } from 'wagmi';
 
 interface Message {
     sender: string;
@@ -14,6 +16,10 @@ interface Message {
 }
 
 const ChatRoom = () => {
+
+    const { address } = useAccount();
+    const { data } = useDoctor(address!)
+    console.log(data)
 
     const navigation = useNavigation();
 
