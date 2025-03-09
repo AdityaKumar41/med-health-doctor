@@ -1,0 +1,23 @@
+"specialties": [
+    {
+        "createdAt": "2025-03-08T07:19:27.954Z",
+        "doctor_id": "cm7zvj8b90000die018qw9v2s",
+        "id": "cm7zvj8bf0003die063l8x27o",
+        "specialty_id": "cl8x12347",
+        "updatedAt": "2025-03-08T07:19:27.954Z"
+    },
+    {
+        "createdAt": "2025-03-08T07:19:27.954Z",
+        "doctor_id": "cm7zvj8b90000die018qw9v2s",
+        "id": "cm7zvj8bf0002die0qeusnamy",
+        "specialty_id": "cl8x12346",
+        "updatedAt": "2025-03-08T07:19:27.954Z"
+    },
+    {
+        "createdAt": "2025-03-08T07:19:27.954Z",
+        "doctor_id": "cm7zvj8b90000die018qw9v2s",
+        "id": "cm7zvj8bf0001die0bmfiw0a5",
+        "specialty_id": "cl8x12345",
+        "updatedAt": "2025-03-08T07:19:27.954Z"
+    }
+]

@@ -5,6 +5,7 @@ import { Text } from "react-native";
 import { router } from "expo-router";
 import { images } from "@/constants/image";
 import { useAccount } from "wagmi";
+import { useDoctor } from "@/hooks/useDoctor";
 
 const Index = () => {
 
@@ -13,13 +14,14 @@ const Index = () => {
   };
 
   const { address } = useAccount()
-  console.log(address)
+  const { data } = useDoctor(address!)
+  console.log(data)
 
   useEffect(() => {
-    if (address) {
+    if (data) {
       router.replace("/(root)/(tabs)");
     }
-  }, [address])
+  }, [data]);
 
   return (
     <View className="flex-col items-center h-full w-full bg-white rounded-3xl max-w-[480px]">
@@ -30,7 +32,7 @@ const Index = () => {
           resizeMode="contain"
         />
       </View>
-      <View className="flex flex-col mt-11 w-full max-w-[343px]">
+      <View className="flex flex-col mt-11 px-3 w-full max-w-[343px]">
         <View className="flex flex-col w-full">
           <View className="text-2xl font-bold leading-9 text-zinc-900">
             <Text className="font-JakartaExtraBold text-3xl">
@@ -45,7 +47,7 @@ const Index = () => {
           </View>
         </View>
       </View>
-      <View className="flex gap-4 items-start mt-10 w-full text-sm font-bold leading-6 text-white max-w-[343px]">
+      <View className="flex px-2 gap-4 items-start mt-10 w-full text-sm font-bold leading-6 text-white max-w-[343px]">
         <Button text="Get Started !" onClick={handleGetStarted} />
       </View>
     </View>

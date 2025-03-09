@@ -26,7 +26,7 @@ const Wallet = () => {
           resizeMode="contain"
         />
       </View>
-      <View className="flex flex-col mt-11 w-full max-w-[343px]">
+      <View className="flex flex-col px-4 mt-11 w-full max-w-[343px]">
         <View className="flex flex-col w-full">
           <View className="text-2xl font-bold leading-9 text-zinc-900">
             <Text className="font-JakartaExtraBold text-3xl">PN - Health</Text>
@@ -38,10 +38,10 @@ const Wallet = () => {
           </View>
         </View>
       </View>
-      <View className="flex gap-4 items-start mt-10 w-full text-sm font-bold leading-6 text-white max-w-[343px]">
+      <View className="flex gap-4 px-4 items-start mt-8 w-full text-sm font-bold leading-6 text-white max-w-[343px]">
         <Button text="Connect Wallet !" onClick={open} />
       </View>
-      <View className="mt-12 p-6 text-sm font-medium leading-6 text-zinc-700">
+      <View className="mt-2 p-6 text-sm font-medium leading-6 text-zinc-700">
         <Text className="font-JakartaRegular text-base text-center">
           By signing up or logging in, i accept the apps{" "}
           <Text className="text-blue-800">Terms of Service</Text> and{" "}

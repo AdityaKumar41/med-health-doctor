@@ -1,15 +1,13 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, Platform, Modal, FlatList } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, FlatList } from "react-native";
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import InputField from "@/components/InputField";
 import { Button } from "@/components/ui/Button";
 import { router } from "expo-router";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount } from "wagmi";
 import { Ionicons } from '@expo/vector-icons';
-import { FormData, FormErrors, InputDetailType } from "@/types/type";
-import axios from "axios";
+import { FormDataRedg, FormErrors, InputDetailType } from "@/types/type";
 import { useDoctor, useDoctorPost } from "@/hooks/useDoctor";
-import abi from "../../contract/Contract.json"
 import * as ImagePicker from 'expo-image-picker';
 import { useSignedUrl } from "@/hooks/useAws";
 import { useSpecialization } from "@/hooks/useSpecialization";
@@ -34,7 +32,7 @@ interface AvailableTime {
 }
 
 // Update FormData type to include profileImage, available days, and time
-interface ExtendedFormData extends FormData {
+interface ExtendedFormData extends FormDataRedg {
   profileImage: ImagePicker.ImagePickerAsset | null;
   filetype: string;
   available_days: string[];
@@ -45,7 +43,6 @@ interface ExtendedFormData extends FormData {
     latitude: number;
     longitude: number;
   };
-  consultancy_fees: string;
 }
 
 const Register = () => {
@@ -63,7 +60,7 @@ const Register = () => {
     email: '',
     age: 0,
     hospital: '',
-    experience: '',
+    experience: 0,
     qualification: '',
     bio: '',
     location_lat: '',
@@ -80,7 +77,7 @@ const Register = () => {
       latitude: 0,
       longitude: 0,
     },
-    consultancy_fees: '',
+    consultancy_fees: 0,
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const { mutate } = useDoctorPost(address!);
@@ -245,7 +242,7 @@ const Register = () => {
     }
 
     // Consultancy Fees validation
-    if (!formData.consultancy_fees.trim()) {
+    if (!formData.consultancy_fees) {
       newErrors.consultancy_fees = "Consultancy fees are required";
     } else if (isNaN(Number(formData.consultancy_fees)) || Number(formData.consultancy_fees) < 0) {
       newErrors.consultancy_fees = "Please enter a valid consultancy fee";
@@ -261,7 +258,7 @@ const Register = () => {
       [key]: value
     }));
     // Clear error when user starts typing
-    if (errors[key]) {
+    if (key in errors && errors[key as keyof FormErrors]) {
       setErrors(prev => ({
         ...prev,
         [key]: ''
@@ -353,9 +350,9 @@ const Register = () => {
         console.log("Signed URL result:", signedUrlResult);
 
         // Upload image to S3 using the helper function
-        await uploadImage(formData.profileImage.uri, imageName, fileType, signedUrlResult.signedUrl);
+        await uploadImage(formData.profileImage.uri, imageName, fileType, signedUrlResult.url);
 
-        profilePictureUrl = signedUrlResult.signedUrl.split('?')[0]; // Extract the URL without query parameters
+        profilePictureUrl = signedUrlResult.url.split('?')[0]; // Extract the URL without query parameters
       }
 
       // Call the API to register the doctor
@@ -377,7 +374,7 @@ const Register = () => {
         },
         available_days: availableDays,
         available_time: availableTime,
-        consultancy_fees: formData.consultancy_fees,
+        consultancy_fees: Number(formData.consultancy_fees),
       });
 
       // router.replace("/(root)/(tabs)");
@@ -691,7 +688,7 @@ const Register = () => {
                 label={input.label}
                 placeholder={input.placeholder}
                 value={String(formData[input.key])}
-                onChangeText={(text: string) => handleInputChange(input.key, text)}
+                onChangeText={(text: string) => handleInputChange(input.key as keyof FormData, text)}
                 error={errors[input.key]}
                 secureTextEntry={input.secureTextEntry}
                 keyboardType={input.keyboardType}

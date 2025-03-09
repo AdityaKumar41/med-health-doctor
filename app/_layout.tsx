@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -17,6 +17,8 @@ import {
   AppKitButton,
 } from "@reown/appkit-wagmi-react-native";
 import { ChatProvider } from '@/context/ChatContext';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 const queryClient = new QueryClient();
 
@@ -33,7 +35,6 @@ const metadata = {
   },
 };
 
-
 const chains = [polygonAmoy, polygonZkEvmTestnet] as const;
 
 const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
@@ -49,6 +50,44 @@ createAppKit({
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+// Configure notification handler for the app
+const configureNotifications = () => {
+  // Set notification handler
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+
+  // Create notification channels for Android
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('chat-messages', {
+      name: 'Chat Messages',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0066CC',
+    });
+  }
+
+  // Listen for notification interactions at the app level
+  return Notifications.addNotificationResponseReceivedListener(response => {
+    const data = response.notification.request.content.data;
+
+    if (data.senderId) {
+      // Navigate to chat with this patient when notification is tapped
+      router.push({
+        pathname: "/(root)/chating",
+        params: {
+          patientId: data.senderId,
+          patientName: data.senderName || 'Patient'
+        }
+      });
+    }
+  });
+};
+
 export default function RootLayout() {
   const [loaded] = useFonts({
     "Jakarta-Bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
@@ -59,6 +98,16 @@ export default function RootLayout() {
     "Jakarta-Regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
     "Jakarta-SemiBold": require("../assets/fonts/PlusJakartaSans-SemiBold.ttf"),
   });
+
+  // Setup notifications when app loads
+  useEffect(() => {
+    const notificationSubscription = configureNotifications();
+
+    // Clean up notification listener when component unmounts
+    return () => {
+      notificationSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (loaded) {

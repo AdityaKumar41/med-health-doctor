@@ -2,41 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { Patient } from "@/types/type";
 
-// Add this new function to get patient by ID
-export const usePatientById = (id: string) => {
-  return useQuery({
-    queryKey: ["patient", id],
-    queryFn: async () => {
-      const response = await axios.get(
-        `${process.env.EXPO_PUBLIC_BASE_URL}/v1/patient/${id}`
-      );
-      return response.data;
-    },
-    enabled: !!id,
-  });
-};
+interface PatientsListResponse {
+  status: string;
+  data: Patient[];
+}
 
-// Add this new function to get multiple patients by ID
-export const usePatientsByIds = (patientIds: string[]) => {
-  return useQuery({
-    queryKey: ["patientsId", patientIds],
+export const usePatientsList = (doctorId: string, wallet_address: string) => {
+  return useQuery<PatientsListResponse>({
+    queryKey: ["doctorPatients", doctorId],
     queryFn: async () => {
-      const response = await axios({
-        method: "POST",
-        data: { patientIds },
-        url: `${process.env.EXPO_PUBLIC_BASE_URL}/v1/patients/bulk`,
-      });
-      return response.data;
-    },
-    enabled: patientIds.length > 0,
-  });
-};
-
-export const usePatient = (patientId: string, wallet_address: string) => {
-  return useQuery({
-    queryKey: ["patient", patientId],
-    queryFn: async () => {
-      const apiUrl = `${process.env.EXPO_PUBLIC_BASE_URL}/v1/patients/${patientId}`;
+      const apiUrl = `${process.env.EXPO_PUBLIC_BASE_URL}/v1/doctors/${doctorId}/patients`;
       try {
         const response = await axios({
           method: "get",
@@ -72,6 +47,6 @@ export const usePatient = (patientId: string, wallet_address: string) => {
         throw error;
       }
     },
-    enabled: !!patientId && !!wallet_address,
+    enabled: !!doctorId && !!wallet_address,
   });
 };
