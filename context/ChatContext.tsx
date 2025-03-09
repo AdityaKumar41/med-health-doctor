@@ -241,21 +241,65 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             return;
         }
 
+        // Make sure we have a clear file type if there's a file URL
+        let finalFileType = file_type;
+
+        if (file_url) {
+            // If no file type provided, try to determine from content
+            if (!finalFileType) {
+                // Check URL for image patterns
+                if (file_url.match(/\.(jpg|jpeg|png|gif)($|\?)/i)) {
+                    // Be explicit about the type
+                    finalFileType = 'image';
+                }
+                // Check URL for PDF patterns
+                else if (file_url.match(/\.pdf($|\?)/i)) {
+                    finalFileType = 'application/pdf';
+                }
+                // Check message for hints
+                else if (message.includes('📷') || message.toLowerCase().includes('image')) {
+                    finalFileType = 'image';
+                }
+                else if (message.includes('📄') || message.toLowerCase().includes('document')) {
+                    finalFileType = 'application/pdf';
+                }
+            }
+
+            // Extra sanity check: if we have specific strings, normalize them
+            if (finalFileType) {
+                const lowerType = finalFileType.toLowerCase();
+                if (lowerType === 'image/jpeg' || lowerType === 'image/png' ||
+                    lowerType === 'image/gif' || lowerType.includes('jpg') ||
+                    lowerType.includes('jpeg') || lowerType.includes('png')) {
+                    // Force simple "image" type to ensure consistent handling
+                    finalFileType = 'image';
+                }
+                else if (lowerType === 'application/pdf' || lowerType.includes('pdf')) {
+                    finalFileType = 'application/pdf';
+                }
+            }
+        }
 
         const chatMessage: ChatMessage = {
             sender: doctor.id,
-            sender_id: doctor.id,  // Add this to match backend expectations
+            sender_id: doctor.id,
             receiver: receiverId,
             message,
             timestamp: new Date(),
             file_url,
-            file_type,
-            sender_name: doctor.name, // Include sender name for notifications
+            file_type: finalFileType,
+            sender_name: doctor.name,
         };
 
         try {
+            // Log what we're actually sending
+            console.log('Sending message with file info:', {
+                hasFile: !!file_url,
+                fileUrl: file_url,
+                fileType: finalFileType
+            });
+
             socket.emit('private-message', chatMessage);
-            console.log('Message sent:', chatMessage);
         } catch (error) {
             console.error('Error sending message:', error);
         }

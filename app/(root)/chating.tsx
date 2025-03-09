@@ -437,7 +437,7 @@ const ChatRoom = () => {
         </View>
     );
 
-    // Handle image selection with improved MIME type handling
+    // Handle image selection with better content type handling
     const handlePickImage = async () => {
         if (chatLocked) {
             Alert.alert('Cannot Send Media', `This chat is in read-only mode because the appointment status is ${appointmentStatus}.`);
@@ -463,14 +463,11 @@ const ChatRoom = () => {
                     fileSize: imageAsset.fileSize
                 });
 
-                // Ensure we have the correct MIME type or derive it from file extension
-                const mimeType = imageAsset.mimeType || getMimeTypeFromUri(imageAsset.uri);
-                console.log("Using MIME type for image:", mimeType);
-
+                // Use the provided MIME type or derive from filename
                 await uploadAndSendFile(
                     imageAsset.uri,
-                    imageAsset.fileName || `image_${Date.now()}.${getExtensionFromMimeType(mimeType)}`,
-                    mimeType,
+                    imageAsset.fileName || `image_${Date.now()}.jpg`,
+                    imageAsset.mimeType || 'image/jpeg',
                     'image'
                 );
             }
@@ -580,6 +577,9 @@ const ChatRoom = () => {
         }
     };
 
+    // Keep track of images that failed to load for fallback rendering
+    const [imageError, setImageError] = useState<Record<string, boolean>>({});
+
     // Handle Send File function with improved error handling
     const handleSendFile = async (fileUrl: string, fileType: string) => {
         if (!socket) {
@@ -617,7 +617,7 @@ const ChatRoom = () => {
         }
     };
 
-    // Upload and send file using signed URL with optimized content-type handling
+    // Upload and send file using signed URL with improved S3 uploads
     const uploadAndSendFile = async (fileUri: string, fileName: string, fileType: string, messageType: 'image' | 'pdf') => {
         if (!fileUri) {
             console.error("No file URI provided");
@@ -628,21 +628,23 @@ const ChatRoom = () => {
         try {
             setIsUploading(true);
 
-            // Ensure we have a valid MIME type - don't rely on derived values
-            const mimeType = fileType || getMimeTypeFromUri(fileUri);
-            console.log(`Uploading file: ${fileName}, MIME type: ${mimeType}`);
+            // Get proper MIME type
+            const mimeType = getMimeType(fileType);
+            console.log('Uploading file:', fileName, 'with type:', mimeType);
 
+            // Get signed URL using the hook
             const response = await getSignedUrl({
                 filename: fileName,
                 filetype: mimeType
             });
+
+            console.log('Signed URL response:', response);
 
             if (!response || !response.url || !response.key) {
                 throw new Error("Failed to get valid signed URL");
             }
 
             const { url, key } = response;
-            console.log(`Got signed URL: ${url}, key: ${key}`);
 
             // Check if file exists and is accessible
             const fileInfo = await FileSystem.getInfoAsync(fileUri);
@@ -650,40 +652,39 @@ const ChatRoom = () => {
                 throw new Error("File does not exist at the specified URI");
             }
 
-            // Binary data upload is more reliable for preserving content types
-            try {
-                // For files, using binary mode is more reliable than base64 for content type handling
-                const fileBlob = await FileSystem.readAsStringAsync(fileUri, {
-                    encoding: FileSystem.EncodingType.Base64
-                });
+            // Read file as base64
+            const base64Data = await FileSystem.readAsStringAsync(fileUri, {
+                encoding: FileSystem.EncodingType.Base64
+            });
 
-                // Important: Use the correct content-type header
-                console.log("Sending S3 upload with Content-Type:", mimeType);
+            console.log('File read as base64, uploading to S3');
+
+            try {
+                // Use axios with explicit content type headers
                 const uploadResponse = await axios({
-                    method: 'PUT',
-                    url,
-                    data: fileBlob,
+                    method: 'put',
+                    url: url,
+                    data: base64Data,
                     headers: {
                         'Content-Type': mimeType,
                         'Content-Encoding': 'base64'
                     },
-                    transformRequest: [(data) => data], // Prevent axios from messing with the data
-                    onUploadProgress: (progressEvent) => {
-                        const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-                        console.log(`Upload progress: ${percentCompleted}%`);
-                    }
+                    transformRequest: [(data) => data], // Don't transform the data
                 });
 
-                if (uploadResponse.status >= 200 && uploadResponse.status < 300) {
-                    console.log("S3 upload successful with response status:", uploadResponse.status);
-                } else {
+                console.log('S3 upload response status:', uploadResponse.status);
+
+                if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
                     throw new Error(`Upload failed with status: ${uploadResponse.status}`);
                 }
-            } catch (uploadError) {
-                console.error("Axios upload failed:", uploadError);
-                console.log("Trying FileSystem.uploadAsync fallback...");
 
-                // Fallback to FileSystem.uploadAsync
+                console.log('File uploaded successfully');
+            } catch (error) {
+                console.error('Axios upload failed:', error);
+
+                // Try FileSystem.uploadAsync fallback method
+                console.log('Trying FileSystem.uploadAsync fallback...');
+
                 const uploadResult = await FileSystem.uploadAsync(url, fileUri, {
                     httpMethod: 'PUT',
                     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -692,31 +693,50 @@ const ChatRoom = () => {
                     }
                 });
 
-                if (uploadResult.status >= 200 && uploadResult.status < 300) {
-                    console.log("FileSystem upload successful with status:", uploadResult.status);
-                } else {
-                    throw new Error(`Upload failed with status: ${uploadResult.status}`);
+                if (uploadResult.status < 200 || uploadResult.status >= 300) {
+                    throw new Error(`Fallback upload failed with status: ${uploadResult.status}`);
                 }
+
+                console.log('Fallback upload successful with status:', uploadResult.status);
             }
 
-            // Construct the complete file URL with proper timestamp to prevent caching issues
+            // Extract S3 URL without query params - important for rendering
             const s3BaseUrl = process.env.EXPO_PUBLIC_AWS_S3_URL;
             if (!s3BaseUrl) {
                 throw new Error("S3 base URL not configured in environment variables");
             }
 
-            // Add timestamp to force image refresh on the receiving end
-            const timestamp = Date.now();
-            const fileUrl = `${s3BaseUrl}/${key}?t=${timestamp}`;
-            console.log("File URL with timestamp:", fileUrl);
+            // Build the direct S3 URL using the key (without query parameters)
+            const fileUrl = `${s3BaseUrl}/${key}`;
+            console.log('File URL for chat:', fileUrl);
 
-            // Send message with file details - ensure we pass the original mime type
+            // Send file message
             await handleSendFile(fileUrl, mimeType);
+
+            // Add immediate local preview
+            const localMessage: Message = {
+                id: `local-${Date.now()}-${Math.random()}`,
+                sender: doctor?.id || '',
+                receiver: patientId as string,
+                message: messageType === 'image' ? '📷 Image' : '📄 Document',
+                timestamp: new Date(),
+                fileUrl: fileUrl,
+                fileType: messageType,
+                fileName: fileName
+            };
+
+            // Add to local messages for immediate display
+            setMessages(prev => [...prev, localMessage]);
+
+            // Scroll to new message
+            setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
 
             setIsUploading(false);
         } catch (error) {
             console.error('Error uploading file:', error);
-            Alert.alert('Upload Failed', 'Failed to upload file. Please try again later.');
+            Alert.alert('Upload Failed', 'Failed to upload file. Please try again.');
             setIsUploading(false);
         }
     };
@@ -800,86 +820,124 @@ const ChatRoom = () => {
         `);
     }
 
-    // Update the message rendering to display images and documents with better MIME type handling
+    // Add this function to detect file type from message content and URL
+    const detectFileTypeFromMessage = (message: string, url: string): 'image' | 'pdf' | undefined => {
+        // Check URL for image extensions
+        if (url.match(/\.(jpg|jpeg|png|gif)($|\?)/i)) {
+            return 'image';
+        }
+        // Check URL for PDF extension
+        else if (url.match(/\.pdf($|\?)/i)) {
+            return 'pdf';
+        }
+
+        // Check message content for hints
+        const lowerMessage = message.toLowerCase();
+        if (message.includes('📷') || lowerMessage.includes('image')) {
+            return 'image';
+        } else if (message.includes('📄') || lowerMessage.includes('document') || lowerMessage.includes('pdf')) {
+            return 'pdf';
+        }
+
+        return undefined;
+    };
+
+    // Enhanced renderMessageContent function with fallback for failed image loading
     const renderMessageContent = (msg: Message) => {
         try {
-            // Debug message content
-            debugMessageContent(msg);
-
-            // Get file URL
             const fileUrl = msg.fileUrl || msg.file_url;
-            const message = msg.message || msg.content;
+            const message = msg.message || msg.content || '';
+
+            // Debug the message content
+            console.log('Rendering message:', {
+                hasFileUrl: !!fileUrl,
+                fileType: msg.fileType || msg.file_type,
+                messageText: message
+            });
 
             // If no file URL, it's a regular text message
             if (!fileUrl) {
                 return (
                     <Text className={`${isSender(msg.sender || msg.sender_id || '') ? 'text-white' : 'text-black'} font-Jakarta`}>
-                        {message || "Empty message"}
+                        {message || "(Empty message)"}
                     </Text>
                 );
             }
 
-            // Get file type - prioritize the actual MIME type if available
-            const fileTypeStr = msg.file_type || '';
-            const fileCategory = determineFileType(fileTypeStr);
+            // Get file type - detect from multiple sources
+            const fileType = msg.fileType || (msg.file_type ? determineFileType(msg.file_type) : undefined);
 
-            // Get full URL and filename
-            // Add a timestamp to the URL to prevent caching if there isn't one already
-            const baseUrl = getFullUrl(fileUrl);
-            const fullUrl = baseUrl.includes('?') ? baseUrl : `${baseUrl}?t=${Date.now()}`;
+            // Use file URL patterns or message content as fallbacks to determine type
+            const isImageMessage =
+                fileType === 'image' ||
+                fileUrl.match(/\.(jpg|jpeg|png|gif)($|\?)/i) ||
+                message.includes('📷') ||
+                message.toLowerCase().includes('image');
+
+            const isPdfMessage =
+                fileType === 'pdf' ||
+                fileUrl.match(/\.pdf($|\?)/i) ||
+                message.includes('📄') ||
+                message.toLowerCase().includes('document');
+
+            // Get full URL and log it for debugging
+            const fullUrl = getFullUrl(fileUrl);
+            console.log('Rendering media with full URL:', fullUrl);
+
+            // Extract filename from URL or use provided filename
             const fileName = msg.fileName || extractFileName(fileUrl);
-            const mimeType = getMimeType(fileTypeStr);
 
-            console.log(`Rendering file message: 
-            - URL: ${fullUrl}
-            - Type: ${fileCategory} (${mimeType})
-            - Name: ${fileName}`
-            );
-
-            // Handle image files with proper MIME type
-            if (fileCategory === 'image') {
+            // Handle images
+            if (isImageMessage) {
                 return (
-                    <View>
-                        <TouchableOpacity
-                            onPress={() => {
-                                console.log("Opening image viewer with MIME type:", mimeType);
-                                setViewerContent({
-                                    fileUrl: fullUrl,
-                                    fileType: mimeType,
-                                    title: fileName
-                                });
-                                setViewerVisible(true);
-                            }}
-                        >
+                    <TouchableOpacity
+                        onPress={() => {
+                            setViewerContent({
+                                fileUrl: fullUrl,
+                                fileType: 'image/jpeg',
+                                title: fileName
+                            });
+                            setViewerVisible(true);
+                        }}
+                    >
+                        {imageError[fullUrl] ? (
+                            // Fallback for error loading image
+                            <View className="w-[180px] h-[180px] rounded-lg bg-gray-200 items-center justify-center">
+                                <Ionicons name="image" size={40} color="#9CA3AF" />
+                                <Text className="mt-2 text-gray-500">Image unavailable</Text>
+                                <Text className="mt-1 text-xs text-gray-500">{fullUrl.substring(0, 20)}...</Text>
+                            </View>
+                        ) : (
                             <Image
                                 source={{ uri: fullUrl }}
-                                className="w-[200px] h-[150px] rounded-lg mb-1"
+                                className="w-[180px] h-[180px] rounded-lg"
                                 resizeMode="cover"
+                                onLoadStart={() => console.log(`Started loading image: ${fullUrl}`)}
+                                onLoad={() => console.log(`Successfully loaded image: ${fullUrl}`)}
                                 onError={(error) => {
-                                    console.error('Image loading error:', error.nativeEvent.error);
-                                    console.log('Failed image URL:', fullUrl);
+                                    console.error('Image loading error for URL:', fullUrl, error.nativeEvent.error);
+                                    setImageError(prev => ({ ...prev, [fullUrl]: true }));
                                 }}
-                                // Add cache busting for newer React Native versions
-                                key={`img-${fullUrl}`}
+                                // Force fresh load with unique key
+                                key={`img-${fullUrl}-${Date.now()}`}
                             />
-                            <Text
-                                className={`text-xs ${isSender(msg.sender || msg.sender_id || '') ? 'text-white' : 'text-black'}`}
-                                numberOfLines={1}
-                            >
-                                {fileName}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                        )}
+                        <Text
+                            className={`text-xs ${isSender(msg.sender || msg.sender_id || '') ? 'text-white' : 'text-black'} mt-1`}
+                            numberOfLines={1}
+                        >
+                            {fileName}
+                        </Text>
+                    </TouchableOpacity>
                 );
             }
             // Handle PDF files
-            else if (fileCategory === 'pdf') {
+            else if (isPdfMessage) {
                 return (
                     <TouchableOpacity
                         className="flex-row items-center bg-opacity-30 bg-gray-200 p-2 rounded-lg"
                         style={{ backgroundColor: isSender(msg.sender || msg.sender_id || '') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' }}
                         onPress={() => {
-                            console.log("Opening PDF viewer:", fullUrl);
                             setViewerContent({
                                 fileUrl: fullUrl,
                                 fileType: 'application/pdf',
@@ -914,7 +972,7 @@ const ChatRoom = () => {
                     </TouchableOpacity>
                 );
             }
-            // If we have a file but can't determine the type, show the message text
+            // Handle other file types by showing message text
             else {
                 return (
                     <Text className={`${isSender(msg.sender || msg.sender_id || '') ? 'text-white' : 'text-black'} font-Jakarta`}>
@@ -924,10 +982,9 @@ const ChatRoom = () => {
             }
         } catch (error) {
             console.error("Error rendering message:", error);
-            // Fallback rendering in case of errors
             return (
-                <Text className="text-red-500 font-Jakarta">
-                    Error displaying message content
+                <Text className={`text-red-500 font-Jakarta`}>
+                    (Error displaying message)
                 </Text>
             );
         }

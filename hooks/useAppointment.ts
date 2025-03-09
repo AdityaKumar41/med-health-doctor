@@ -93,7 +93,9 @@ export const useAppointmentApprove = (wallet_address: string) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointmentquery", "appointmentPending"] });
+      queryClient.invalidateQueries({
+        queryKey: ["appointmentquery", "appointmentPending"],
+      });
     },
   });
 };
@@ -126,11 +128,12 @@ export const useAppointmentComplete = (address: string) => {
     },
     onSuccess: () => {
       // Invalidate appointments query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ["appointment"] });
+      queryClient.invalidateQueries({
+        queryKey: ["appointment", "appointmentPending"],
+      });
     },
   });
 };
-
 
 export const useAppointmentPending = (wallet_address: string) => {
   return useQuery({
@@ -172,4 +175,4 @@ export const useAppointmentPending = (wallet_address: string) => {
       }
     },
   });
-}
+};
